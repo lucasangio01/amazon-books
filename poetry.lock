@@ -597,6 +597,17 @@ files = [
 devel = ["colorama", "json-spec", "jsonschema", "pylint", "pytest", "pytest-benchmark", "pytest-cache", "validictory"]
 
 [[package]]
+name = "findspark"
+version = "2.0.1"
+description = "Find pyspark to make it importable."
+optional = false
+python-versions = "*"
+files = [
+    {file = "findspark-2.0.1-py2.py3-none-any.whl", hash = "sha256:e5d5415ff8ced6b173b801e12fc90c1eefca1fb6bf9c19c4fc1f235d4222e753"},
+    {file = "findspark-2.0.1.tar.gz", hash = "sha256:aa10a96cb616cab329181d72e8ef13d2dc453b4babd02b5482471a0882c1195e"},
+]
+
+[[package]]
 name = "fonttools"
 version = "4.58.4"
 description = "Tools to manipulate font files"
@@ -2916,4 +2927,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "dc2683f5c9b4264bcf0f42038a4600ebbf90b7cd71d979ef416b3ff9d660520e"
+content-hash = "b766ca680293a45960659cd4328b2176cc91bcab3631b58c58a97669d0ceda11"
