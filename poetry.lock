@@ -2013,13 +2013,13 @@ tests = ["pytest"]
 
 [[package]]
 name = "py4j"
-version = "0.10.9.9"
+version = "0.10.9.7"
 description = "Enables Python programs to dynamically access arbitrary Java objects"
 optional = false
 python-versions = "*"
 files = [
-    {file = "py4j-0.10.9.9-py2.py3-none-any.whl", hash = "sha256:c7c26e4158defb37b0bb124933163641a2ff6e3a3913f7811b0ddbe07ed61533"},
-    {file = "py4j-0.10.9.9.tar.gz", hash = "sha256:f694cad19efa5bd1dee4f3e5270eb406613c974394035e5bfc4ec1aba870b879"},
+    {file = "py4j-0.10.9.7-py2.py3-none-any.whl", hash = "sha256:85defdfd2b2376eb3abf5ca6474b51ab7e0de341c75a02f46dc9b5976f5a5c1b"},
+    {file = "py4j-0.10.9.7.tar.gz", hash = "sha256:0b6e5315bb3ada5cf62ac651d107bb2ebc02def3dee9d9548e3baac644ea8dbb"},
 ]
 
 [[package]]
@@ -2063,23 +2063,23 @@ diagrams = ["jinja2", "railroad-diagrams"]
 
 [[package]]
 name = "pyspark"
-version = "4.0.0"
+version = "3.5.0"
 description = "Apache Spark Python API"
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.8"
 files = [
-    {file = "pyspark-4.0.0.tar.gz", hash = "sha256:38db1b4f6095a080d7605e578d775528990e66dc326311d93e94a71cfc24e5a5"},
+    {file = "pyspark-3.5.0.tar.gz", hash = "sha256:d41a9b76bd2aca370a6100d075c029e22ba44c5940927877e9435a3a9c566558"},
 ]
 
 [package.dependencies]
-py4j = "0.10.9.9"
+py4j = "0.10.9.7"
 
 [package.extras]
-connect = ["googleapis-common-protos (>=1.65.0)", "grpcio (>=1.67.0)", "grpcio-status (>=1.67.0)", "numpy (>=1.21)", "pandas (>=2.0.0)", "pyarrow (>=11.0.0)"]
-ml = ["numpy (>=1.21)"]
-mllib = ["numpy (>=1.21)"]
-pandas-on-spark = ["numpy (>=1.21)", "pandas (>=2.0.0)", "pyarrow (>=11.0.0)"]
-sql = ["numpy (>=1.21)", "pandas (>=2.0.0)", "pyarrow (>=11.0.0)"]
+connect = ["googleapis-common-protos (>=1.56.4)", "grpcio (>=1.56.0)", "grpcio-status (>=1.56.0)", "numpy (>=1.15)", "pandas (>=1.0.5)", "pyarrow (>=4.0.0)"]
+ml = ["numpy (>=1.15)"]
+mllib = ["numpy (>=1.15)"]
+pandas-on-spark = ["numpy (>=1.15)", "pandas (>=1.0.5)", "pyarrow (>=4.0.0)"]
+sql = ["numpy (>=1.15)", "pandas (>=1.0.5)", "pyarrow (>=4.0.0)"]
 
 [[package]]
 name = "python-dateutil"
@@ -2696,6 +2696,32 @@ files = [
 ]
 
 [[package]]
+name = "spark-nlp"
+version = "6.0.3"
+description = "John Snow Labs Spark NLP is a natural language processing library built on top of Apache Spark ML. It provides simple, performant & accurate NLP annotations for machine learning pipelines, that scale easily in a distributed environment."
+optional = false
+python-versions = "*"
+files = [
+    {file = "spark_nlp-6.0.3-py2.py3-none-any.whl", hash = "sha256:6580f8832b522916a17f5ca78314106e27efcba1738097f10786ce83c77e416e"},
+    {file = "spark_nlp-6.0.3.tar.gz", hash = "sha256:ff09f27c512401cff1ec3af572069b2e2af35b87a0f6737c5340538bac10faf7"},
+]
+
+[[package]]
+name = "sparknlp"
+version = "1.0.0"
+description = "John Snow Labs Spark NLP is a natural language processing library built on top of Apache Spark ML. It provides simple, performant & accurate NLP annotations for machine learning pipelines, that scale easily in a distributed environment."
+optional = false
+python-versions = "*"
+files = [
+    {file = "sparknlp-1.0.0-py3-none-any.whl", hash = "sha256:226e2597eb951d518f30847b42137e1ba8068448c65f2d48dadc67dfe9fc97b0"},
+    {file = "sparknlp-1.0.0.tar.gz", hash = "sha256:f19cfd70d2eebb2bef47a72895da4d4390d4e0f1b34ab1842252c64672e2fe65"},
+]
+
+[package.dependencies]
+numpy = "*"
+spark-nlp = "*"
+
+[[package]]
 name = "stack-data"
 version = "0.6.3"
 description = "Extract data from python stack frames and tracebacks for informative displays"
@@ -2927,4 +2953,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "b766ca680293a45960659cd4328b2176cc91bcab3631b58c58a97669d0ceda11"
+content-hash = "8105092f86bc261a04f06b9d33416404e85d6b082d62316d6d3023a85e85ac01"

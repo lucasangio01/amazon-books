@@ -12,9 +12,11 @@ pandas = "^2.3.0"
 matplotlib = "^3.10.3"
 seaborn = "^0.13.2"
 scikit-learn = "^1.7.0"
-pyspark = "^4.0.0"
+pyspark = "3.5.0"
 jupyter = "^1.1.1"
 findspark = "^2.0.1"
+sparknlp = "^1.0.0"
+spark-nlp = "^6.0.3"
 
 
 [build-system]
