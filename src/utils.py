@@ -7,12 +7,13 @@ from pyspark.sql.types import ArrayType, FloatType, StructType, StructField, Int
 from pyspark.sql.window import Window
 
 from pyspark.ml import Pipeline
-from pyspark.ml.feature import HashingTF, IDF, BucketedRandomProjectionLSH
+from pyspark.ml.feature import HashingTF, IDF, BucketedRandomProjectionLSH, Normalizer
 from pyspark.ml.linalg import Vectors, VectorUDT, DenseVector
 
 from sparknlp.pretrained import PretrainedPipeline
 from sparknlp.base import DocumentAssembler, Finisher
 from sparknlp.annotator import Tokenizer, StopWordsCleaner, LemmatizerModel, SentenceDetectorDLModel, NorvigSweetingModel, BertSentenceEmbeddings
+
 
 # some books have duplicates, with some differences in the title. We only keep one of each
 duplicated_titles = ["Pride & Prejudice (Penguin Classics)", "Pride & Prejudice (New Windmill)",
@@ -66,6 +67,7 @@ duplicated_titles = ["Pride & Prejudice (Penguin Classics)", "Pride & Prejudice 
 
 
 def load_data(spark, chosen_data):
+
     duplicated_df = spark.createDataFrame([(title,) for title in duplicated_titles], ["book_title"])
 
     reviews_schema = StructType([
@@ -147,40 +149,56 @@ def load_data(spark, chosen_data):
         return df_reviews, None
 
 
-def embedding_pipeline_reviews(dataset):
-  document_assembler = DocumentAssembler().setInputCol("review_text").setOutputCol("document")
-  sentence_embeddings = BertSentenceEmbeddings().pretrained("sent_small_bert_L2_128", "en").setInputCols(["document"]).setOutputCol("embeddings")
-  pipeline = Pipeline(stages = [document_assembler, sentence_embeddings])
-
-  result = pipeline.fit(dataset).transform(dataset)
-  extract_embedding = udf(lambda arr: arr[0].embeddings, ArrayType(FloatType()))
-  result = result.withColumn("embedding_vector", extract_embedding("embeddings")).select("book_title", "embedding_vector")
-
-  to_vector_udf = udf(lambda arr: Vectors.dense(arr), VectorUDT())
-  result = result.withColumn("embedding_vector_ml", to_vector_udf("embedding_vector")).select("book_title", "embedding_vector_ml")
-
-  return result
-
-
-def merge_reviews(dataset):
-
-  def average_vectors(vectors):
-      arrays = np.array([v.toArray() for v in vectors])
-      avg_arr = np.mean(arrays, axis=0)
-      return DenseVector(avg_arr)
-
-  avg_udf = udf(average_vectors, VectorUDT())
-  book_embeddings = dataset.groupBy("book_title").agg(collect_list("embedding_vector_ml").alias("embeddings_list")).withColumn("book_embedding", avg_udf("embeddings_list")).select("book_title", "book_embedding")
-
-  def compute_similarity():
-    if chosen_data == "trial_full":
-      threshold = 5.0
+def embedding_pipeline(dataset):
+    if dataset == df_reviews:
+        text_column = "review_text"
     else:
-      threshold = 1.0
-    lsh = BucketedRandomProjectionLSH(inputCol="book_embedding", outputCol="hashes", bucketLength=1.0, numHashTables=3)
-    similarity_model = lsh.fit(book_embeddings)
-    similar_books = similarity_model.approxSimilarityJoin(book_embeddings, book_embeddings, threshold, distCol="distance").filter("datasetA.book_title < datasetB.book_title").selectExpr("datasetA.book_title as book1", "datasetB.book_title as book2", "distance").orderBy("distance")
-    return similar_books
+        text_column = "description"
 
-  books_similarity = compute_similarity()
-  return books_similarity
+    document_assembler = DocumentAssembler().setInputCol(text_column).setOutputCol("document")
+    sentence_embeddings = BertSentenceEmbeddings().pretrained("sent_small_bert_L2_128", "en").setInputCols(
+        ["document"]).setOutputCol("embeddings")
+    pipeline = Pipeline(stages=[document_assembler, sentence_embeddings])
+
+    result = pipeline.fit(dataset).transform(dataset)
+    extract_embedding = udf(lambda arr: arr[0].embeddings, ArrayType(FloatType()))
+    result = result.withColumn("embedding_vector", extract_embedding("embeddings")).select("book_title",
+                                                                                           "embedding_vector")
+
+    to_vector_udf = udf(lambda arr: Vectors.dense(arr), VectorUDT())
+    result = result.withColumn("embedding_vector_ml", to_vector_udf("embedding_vector")).select("book_title",
+                                                                                                "embedding_vector_ml")
+
+    return result
+
+
+def average_vectors(vectors):
+    arrays = np.array([v.toArray() for v in vectors])
+    avg_arr = np.mean(arrays, axis=0)
+
+    return DenseVector(avg_arr)
+
+
+def group_vectors(embedded_data):
+    avg_udf = udf(average_vectors, VectorUDT())
+    book_embeddings = embedded_data.groupBy("book_title").agg(
+        collect_list("embedding_vector_ml").alias("embeddings_list")).withColumn("book_embedding",
+                                                                                 avg_udf("embeddings_list")).select(
+        "book_title", "book_embedding")
+
+    normalizer = Normalizer(inputCol="book_embedding", outputCol="norm_embedding", p=2.0)
+    book_embeddings = normalizer.transform(book_embeddings).select("book_title", "norm_embedding")
+
+    return book_embeddings
+
+
+def compute_similarity(grouped_reviews):
+    lsh = BucketedRandomProjectionLSH(inputCol="norm_embedding", outputCol="hashes", bucketLength=2.0, numHashTables=3)
+    similarity_model = lsh.fit(grouped_reviews)
+    similar_books = similarity_model.approxSimilarityJoin(grouped_reviews, grouped_reviews, threshold=0.3,
+                                                          distCol="distance").filter(
+        "datasetA.book_title < datasetB.book_title").withColumn("cosine_similarity", (1 - col("distance"))).selectExpr(
+        "datasetA.book_title as book1", "datasetB.book_title as book2", "cosine_similarity").orderBy(
+        "cosine_similarity", ascending=False)
+
+    return similar_books
