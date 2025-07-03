@@ -1,19 +1,14 @@
 import numpy as np
-
-import pyspark
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import count, when, from_unixtime, length, year, col, array_size, udf, avg, collect_list, row_number
+from pyspark.sql.functions import from_unixtime, length, year, col, udf, row_number, collect_list, concat_ws
 from pyspark.sql.types import ArrayType, FloatType, StructType, StructField, IntegerType, StringType
 from pyspark.sql.window import Window
 
 from pyspark.ml import Pipeline
-from pyspark.ml.feature import HashingTF, IDF, BucketedRandomProjectionLSH, Normalizer
+from pyspark.ml.feature import BucketedRandomProjectionLSH, Normalizer, HashingTF, MinHashLSH
 from pyspark.ml.linalg import Vectors, VectorUDT, DenseVector
 
-from sparknlp.pretrained import PretrainedPipeline
 from sparknlp.base import DocumentAssembler, Finisher
-from sparknlp.annotator import Tokenizer, StopWordsCleaner, LemmatizerModel, SentenceDetectorDLModel, NorvigSweetingModel, BertSentenceEmbeddings
-
+from sparknlp.annotator import Tokenizer, StopWordsCleaner, LemmatizerModel, BertSentenceEmbeddings
 
 # some books have duplicates, with some differences in the title. We only keep one of each
 duplicated_titles = ["Pride & Prejudice (Penguin Classics)", "Pride & Prejudice (New Windmill)",
@@ -149,30 +144,48 @@ def load_data(spark, chosen_data):
         return df_reviews, None
 
 
-def embedding_pipeline(dataset):
-    if dataset == df_reviews:
-        text_column = "review_text"
-    else:
-        text_column = "description"
+def pretrained_pipeline(dataset):
 
-    document_assembler = DocumentAssembler().setInputCol(text_column).setOutputCol("document")
-    sentence_embeddings = BertSentenceEmbeddings().pretrained("sent_small_bert_L2_128", "en").setInputCols(
-        ["document"]).setOutputCol("embeddings")
-    pipeline = Pipeline(stages=[document_assembler, sentence_embeddings])
+  if dataset == df_reviews:
+    text_column = "review_text"
+  else:
+    text_column = "description"
 
-    result = pipeline.fit(dataset).transform(dataset)
-    extract_embedding = udf(lambda arr: arr[0].embeddings, ArrayType(FloatType()))
-    result = result.withColumn("embedding_vector", extract_embedding("embeddings")).select("book_title",
-                                                                                           "embedding_vector")
+  document_assembler = DocumentAssembler().setInputCol(text_column).setOutputCol("document")
+  sentence_embeddings = BertSentenceEmbeddings().pretrained("sent_small_bert_L2_128", "en").setInputCols(["document"]).setOutputCol("embeddings")
+  pipeline = Pipeline(stages = [document_assembler, sentence_embeddings])
 
-    to_vector_udf = udf(lambda arr: Vectors.dense(arr), VectorUDT())
-    result = result.withColumn("embedding_vector_ml", to_vector_udf("embedding_vector")).select("book_title",
-                                                                                                "embedding_vector_ml")
+  result = pipeline.fit(dataset).transform(dataset)
+  extract_embedding = udf(lambda arr: arr[0].embeddings, ArrayType(FloatType()))
+  result = result.withColumn("embedding_vector", extract_embedding("embeddings")).select("book_title", "embedding_vector")
 
-    return result
+  to_vector_udf = udf(lambda arr: Vectors.dense(arr), VectorUDT())
+  result = result.withColumn("embedding_vector_ml", to_vector_udf("embedding_vector")).select("book_title", "embedding_vector_ml")
+
+  return result
+
+
+def custom_pipeline(dataset):
+
+  if dataset in (df_reviews, customized_reviews_grouped):
+    text_column = "review_text"
+  else:
+    text_column = "description"
+
+  document_assembler = DocumentAssembler().setInputCol(text_column).setOutputCol("document")
+  tokenizer = Tokenizer().setInputCols(["document"]).setOutputCol("token")
+  stopwords_cleaner = StopWordsCleaner().setInputCols(["token"]).setOutputCol("clean_tokens").setCaseSensitive(False)
+  lemmatizer = LemmatizerModel.pretrained().setInputCols(["clean_tokens"]).setOutputCol("lemma")
+  finisher = Finisher().setInputCols(["lemma"]).setCleanAnnotations(True)
+
+  pipeline = Pipeline(stages = [document_assembler, tokenizer, stopwords_cleaner, lemmatizer, finisher])
+  result = pipeline.fit(dataset).transform(dataset).select("book_title", "finished_lemma")
+
+  return result
 
 
 def average_vectors(vectors):
+
     arrays = np.array([v.toArray() for v in vectors])
     avg_arr = np.mean(arrays, axis=0)
 
@@ -180,25 +193,42 @@ def average_vectors(vectors):
 
 
 def group_vectors(embedded_data):
-    avg_udf = udf(average_vectors, VectorUDT())
-    book_embeddings = embedded_data.groupBy("book_title").agg(
-        collect_list("embedding_vector_ml").alias("embeddings_list")).withColumn("book_embedding",
-                                                                                 avg_udf("embeddings_list")).select(
-        "book_title", "book_embedding")
 
-    normalizer = Normalizer(inputCol="book_embedding", outputCol="norm_embedding", p=2.0)
-    book_embeddings = normalizer.transform(book_embeddings).select("book_title", "norm_embedding")
+  avg_udf = udf(average_vectors, VectorUDT())
+  book_embeddings = embedded_data.groupBy("book_title").agg(collect_list("embedding_vector_ml").alias("embeddings_list")).withColumn("book_embedding", avg_udf("embeddings_list")).select("book_title", "book_embedding")
 
-    return book_embeddings
+  normalizer = Normalizer(inputCol = "book_embedding", outputCol = "norm_embedding", p = 2.0)
+  book_embeddings = normalizer.transform(book_embeddings).select("book_title", "norm_embedding")
+
+  return book_embeddings
 
 
-def compute_similarity(grouped_reviews):
-    lsh = BucketedRandomProjectionLSH(inputCol="norm_embedding", outputCol="hashes", bucketLength=2.0, numHashTables=3)
-    similarity_model = lsh.fit(grouped_reviews)
-    similar_books = similarity_model.approxSimilarityJoin(grouped_reviews, grouped_reviews, threshold=0.3,
-                                                          distCol="distance").filter(
-        "datasetA.book_title < datasetB.book_title").withColumn("cosine_similarity", (1 - col("distance"))).selectExpr(
-        "datasetA.book_title as book1", "datasetB.book_title as book2", "cosine_similarity").orderBy(
-        "cosine_similarity", ascending=False)
+def group_text(dataset):
 
-    return similar_books
+  if dataset == df_reviews:
+    text_column = "review_text"
+  else:
+    text_column = "description"
+
+  return (dataset.groupBy("book_title").agg(concat_ws(" ", collect_list(text_column)).alias(text_column)))
+
+
+def compute_cosine_similarity(grouped_reviews):
+
+  lsh = BucketedRandomProjectionLSH(inputCol = "norm_embedding", outputCol = "hashes", bucketLength = 2.0, numHashTables = 3)
+  cosine_similarity_model = lsh.fit(grouped_reviews)
+  similar_books_cosine = cosine_similarity_model.approxSimilarityJoin(grouped_reviews, grouped_reviews, threshold = 0.4, distCol = "distance").filter("datasetA.book_title < datasetB.book_title").withColumn("cosine_similarity", (1 - col("distance"))).selectExpr("datasetA.book_title as book1", "datasetB.book_title as book2", "cosine_similarity").orderBy("cosine_similarity", ascending = False)
+
+  return similar_books_cosine
+
+
+def compute_jaccard_similarity(grouped_reviews):
+
+  hashingTF = HashingTF(inputCol = "finished_lemma", outputCol = "features", numFeatures = 10000)
+  featurized = hashingTF.transform(grouped_reviews)
+  mh = MinHashLSH(inputCol = "features", outputCol = "hashes", numHashTables = 3)
+
+  jaccard_similarity_model = mh.fit(featurized)
+  similar_books_jaccard = jaccard_similarity_model.approxSimilarityJoin(featurized, featurized, threshold = 0.9, distCol="jaccard_distance").filter("datasetA.book_title < datasetB.book_title").withColumn("jaccard_similarity", 1 - col("jaccard_distance")).selectExpr("datasetA.book_title as book1", "datasetB.book_title as book2", "jaccard_similarity").orderBy("jaccard_similarity", ascending = False)
+
+  return similar_books_jaccard

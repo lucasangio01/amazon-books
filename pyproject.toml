@@ -17,6 +17,7 @@ jupyter = "^1.1.1"
 findspark = "^2.0.1"
 sparknlp = "^1.0.0"
 spark-nlp = "^6.0.3"
+umap = "^0.1.1"
 
 
 [build-system]
