@@ -1,4 +1,4 @@
-data/Books_rating.csv
+*.csv
 .venv/
 .idea/
 src/__pycache__/
