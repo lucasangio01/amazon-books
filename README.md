@@ -1,3 +1,12 @@
-# Project 1: Finding similar items
+# Finding similar items
 
-The task is to implement a detector of pairs of similar book reviews. You can choose how to encode reviews and how to measure their similarity, although a simple choice would be that of processing the review/text column of the Books_rating.csv file, using the Jaccard similarity.
+---
+_Luca Sangiovanni _luca.sangiovanni.2001@gmail.com__
+
+---
+
+This project aims to implement a detector of pairs of similar Amazon books using **PySpark**. The similarity was copmuted based on both the user reviews and the books plot description.\
+Both the <ins>Cosine Similarity</ins> and the <ins>Jaccard Similarity</ins> have been used, and the results have been compared.
+
+> The code can be run either on Google Colab or using the loaded jupyter and python files.\
+> A full PDF report is included.
