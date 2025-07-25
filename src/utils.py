@@ -10,59 +10,16 @@ from pyspark.ml.linalg import Vectors, VectorUDT, DenseVector
 from sparknlp.base import DocumentAssembler, Finisher
 from sparknlp.annotator import Tokenizer, StopWordsCleaner, LemmatizerModel, BertSentenceEmbeddings
 
-# some books have duplicates, with some differences in the title. We only keep one of each
-duplicated_titles = ["Pride & Prejudice (Penguin Classics)", "Pride & Prejudice (New Windmill)",
-                     "Hannibal (Hannibal Lecter)", "Jane Eyre (Penguin Classics)", "Jane Eyre (Large Print)",
-                     "Jane Eyre (Signet classics)", "Jane Eyre (Simple English)", "Jane Eyre (New Windmill)",
-                     "Jane Eyre (Everyman's Classics)", "Jane Eyre: Complete and Unabridged (Puffin Classics)",
-                     "Of Mice and Men (Penguin Audiobooks)",
-                     "Me Talk Pretty One Day (Turtleback School & Library Binding Edition)", "Me Talk Pretty One Day C",
-                     "Wuthering Heights (Riverside editions)",
-                     "Wuthering Heights (Penguin Audiobooks)", "Wuthering Heights (New Windmill)",
-                     "A Tale of Two Cities, Literary Touchstone Edition",
-                     "A Christmas Carol, in Prose: Being a Ghost Story of Christmas (Collected Works of Charles Dickens)",
-                     "Christmas Carol (Ladybird Classics)", "Frankenstein (Running Press classics)",
-                     "Signature Classics - Great Expectations (Signature Classics Series)",
-                     "The Scarlet Letter (Lake Illustrated Classics, Collection 2)",
-                     "The Adventures of Huckleberry Finn (Courage Literary Classics)",
-                     "The Picture of Dorian Gray (The Classic Collection)", "Picture of Dorian Gray",
-                     "Little Women (Courage giant classics)", "Down Under; Abridged",
-                     "Heart of Darkness (Everyman Classics)",
-                     "The Secret Garden (Worlds Classics)", "everything on this page is for Treasure Island",
-                     "In the Heart of the Sea", "the Picture of Dorian Gray", "Wuthering Heights.",
-                     "Daughter of Fortune CD",
-                     "Adventures of Huckleberry Finn (Simple English)",
-                     "Awakening: Kate Chopin Pb (Case Studies in Contemporary)",
-                     "Tess of the D'Urbervilles (New Wessex editions)",
-                     "The Awakening: Complete, Authoritative Text With Biographical and Historical Contexts, Critical History, and Essays from Five Contemporary Critical Perspectives (Case Studies in Contemporary Criticism)",
-                     "Tess of the d'Urbervilles (Cambridge Literature)",
-                     "Tess of Th D'Urbervilles (Pbk)(Oop) (Bloom's Notes)", "Tess of the Durbervilles",
-                     "Tess of the D'urbervilles (Summer Classics)",
-                     "The Heart Is a Lonely Hunter",
-                     "Stone Of Tears (Turtleback School & Library Binding Edition) (Sword of Truth)", "Lucky Man",
-                     "The Call of the Wild (Dover Large Print Classics)",
-                     "Sense And Sensibility (CH) (Jane Austen Collection)",
-                     "Sense and Sensibility (Wordsworth Hardback Library)", "Sense and sensibility",
-                     "Emma (Signet classics)", "Emma (Riverside Editions)",
-                     "Emma (CH) (Jane Austen Collection)", "Emma (Progress English)", "Emma (The World's Classics)",
-                     "Emma (Radio Collection)", "Emma (Summer Classics)", "Persuasion (World's Classics)",
-                     "Bet Me (Brilliance Audio on Compact Disc)", "Sense & Sensibility Cds (Penguin Classics)",
-                     "Tess of the D'Urbervilles", "Wuthering Heights (Signet classics)", "Alice in Wonderland",
-                     "Alice in Wonderland (Tell tales)",
-                     "The Picture of Dorian Gray (Classic Collection (Brilliance Audio))",
-                     "Great Expectations (Signet classics)", "Heart of Darkness and the Secret Sharer",
-                     "Alice's Adventures in Wonderland and Through the Looking Glass (Classic Collection (Brilliance Audio))",
-                     "Treasure Island (Classic Illustrated)",
-                     "Under and Alone: The True Story of the Undercover Agent Who Infiltrated America's Most Violent Outlaw Motorcycle Gang",
-                     "This Present Darkness (Turtleback School & Library Binding Edition)",
-                     "Angela's Ashes (Turtleback School & Library Binding Edition)",
-                     "The Awakening: Complete, Authoritative Text With Biographical & Historical Contexts, Critical History, & Essays from Five Contemporary Critica. Perspectives (Case Studies in Contemporary Criticism)",
-                     "Casting the First Stone", "The Hound of the Baskervilles (Signet Classics)",
-                     "Hound of the Baskervilles (Lrs Large Print Heritage Series)"]
 
+# some books have duplicates, with some differences in the title. We only keep one of each
+def load_duplicated_titles(file_path = "https://github.com/lucasangio01/amazon-books/blob/master/data/duplicated_titles.txt"):
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip()]
 
 def load_data(spark, chosen_data):
 
+    duplicated_titles = load_duplicated_titles()
     duplicated_df = spark.createDataFrame([(title,) for title in duplicated_titles], ["book_title"])
 
     reviews_schema = StructType([

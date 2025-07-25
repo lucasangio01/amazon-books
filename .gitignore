@@ -1,2 +1,5 @@
-data/books_data.csv
 data/Books_rating.csv
+.venv/
+.idea/
+src/__pycache__/
+src/artifacts/
